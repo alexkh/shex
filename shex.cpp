@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <cmath>
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
@@ -235,6 +237,33 @@ int main(int argc, char *argv[]) {
 	glBindFragDataLocation(shaderProgram, 0, "outColor");
 	glLinkProgram(shaderProgram);
 	glUseProgram(shaderProgram);
+
+	// load the linen pixel shader:
+	{
+		GLuint linen_shader = glCreateProgram();
+		// load the fragment shader:
+		std::ifstream t("linen.glsl");
+		std::stringstream buffer;
+		buffer << t.rdbuf();
+		const GLchar *text_str = buffer.str().c_str();
+		// compile the fragment shader:
+		GLuint linen_fragment = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(linen_fragment, 1, &text_str, NULL);
+		glCompileShader(linen_fragment);
+		glGetShaderiv(linen_fragment, GL_COMPILE_STATUS, &status);
+		if(status != GL_TRUE) {
+			char errbuf[512];
+			glGetShaderInfoLog(linen_fragment, 512, NULL, errbuf);
+			std::cout << "Error compiling linen.glsl " << errbuf <<
+				std::endl;
+		}
+		// link
+		glAttachShader(linen_shader, vertexShader);
+		glAttachShader(linen_shader, linen_fragment);
+		glLinkProgram(linen_shader);
+		glUseProgram(linen_shader);
+	}
+
 
 	// Specify the layout of the vertex data:
 	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
