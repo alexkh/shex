@@ -3,6 +3,8 @@
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <SDL2/SDL_opengl.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -163,7 +165,7 @@ int main(int argc, char *argv[]) {
 		sizeof(elements), elements, GL_STATIC_DRAW);
 
 	// Create a texture:
-	GLuint tex[2];
+	GLuint tex[8];
 	glGenTextures(sizeof(tex), tex);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, tex[0]);
@@ -187,6 +189,20 @@ int main(int argc, char *argv[]) {
 						GL_LINEAR_MIPMAP_LINEAR);
 	// Create a mipmap:
 	glGenerateMipmap(GL_TEXTURE_2D);
+
+	// FONT:
+	{
+		int x, y, n;
+		unsigned char *data = stbi_load("font.png", &x, &y, &n, 1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, tex[1]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, x, y, 0,
+			GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+						GL_NEAREST);
+	}
 
 	// Create and compile the vertex shader:
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -245,6 +261,9 @@ int main(int argc, char *argv[]) {
 		GLint uniColor = glGetUniformLocation(
 					shaderProgram, "triangleColor");
 		glUniform3f(uniColor, 1.0f, 0.0f, 0.0f);
+		// Specify texture:
+		GLint tex_id = glGetUniformLocation(shaderProgram, "tex");
+		glUniform1i(tex_id, 1);
 		// 2nd parameter: number of indices to draw, type, offset
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		SDL_GL_SwapWindow(displayWindow);
