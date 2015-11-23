@@ -6,8 +6,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH 480
+#define SCREEN_HEIGHT 1000
 
 #define OPENGL_MAJOR_VERSION 2
 #define OPENGL_MINOR_VERSION 0
@@ -52,6 +52,7 @@ void Display_InitGL() {
 
 // function to reset our viewport after a window resize
 int Display_SetViewport(int width, int height) {
+	std::cout << "Set Veiweport\n";
 	GLfloat ratio;
 	if(height < 1) {
 		height = 1;
@@ -98,7 +99,7 @@ int main(int argc, char *argv[]) {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, OPENGL_MAJOR_VERSION);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, OPENGL_MINOR_VERSION);
 
-	SDL_Window *displayWindow = SDL_CreateWindow("Very basic SDL2 OpenGL",
+	SDL_Window *displayWindow = SDL_CreateWindow("shex",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
 
@@ -252,9 +253,25 @@ int main(int argc, char *argv[]) {
 //	Display_Render(displayWindow);
 //	SDL_Delay(2000);
 
+	SDL_Event e;
+	bool quit = false;
+
 	while(1) {
+		// process events:
+		while(SDL_PollEvent(&e) != 0) {
+			if(e.type == SDL_QUIT) {
+				quit = true;
+			}
+			if(e.type == SDL_WINDOWEVENT &&
+			(e.window.event ==SDL_WINDOWEVENT_RESIZED ||
+			e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)) {
+				Display_SetViewport(e.window.data1,
+					e.window.data2);
+			}
+		}
+		if(quit) break;
 		// Clear the screen to black:
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
 //		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		// Draw a triangle from 3 vertices:
