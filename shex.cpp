@@ -8,8 +8,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define SCREEN_WIDTH 480
-#define SCREEN_HEIGHT 1000
+#define WIN_WIDTH 480
+#define WIN_HEIGHT 1040
 
 #define OPENGL_MAJOR_VERSION 2
 #define OPENGL_MINOR_VERSION 0
@@ -37,59 +37,21 @@ const GLchar *fragmentSource =
 	"	outColor = texture(tex, Texcoord) * vec4(Color, 1.0);"
 	"}";
 
-void Display_InitGL() {
-	// enable smooth shading
-	glShadeModel(GL_SMOOTH);
-	// set the background red
-	glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
-	// depth buffer setup
-	glClearDepth(1.0f);
-	// enable depth testing
-	glEnable(GL_DEPTH_TEST);
-	// the type of depth test to do
-	glDepthFunc(GL_LEQUAL);
-	// really nice perspective calculations
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-}
+class Shex {
+public:
+	Shex() {};
+	int init();
+	void loop();
+private:
+	int winw, winh; // window width and height in pixels
+	SDL_Window *win;
+	SDL_GLContext glcontext;
+	void init_gl();
+	void set_viewport();
+	void draw();
+};
 
-// function to reset our viewport after a window resize
-int Display_SetViewport(int width, int height) {
-	std::cout << "Set Veiweport\n";
-	GLfloat ratio;
-	if(height < 1) {
-		height = 1;
-	}
-	ratio = (GLfloat)width / (GLfloat)height;
-	// setup our viewport
-	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
-	// change to the projection matrix and set our viewing volume
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	// set our orthogonal projection:
-	glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
-	// make sure we are changing the model view and not the projection
-	glMatrixMode(GL_MODELVIEW);
-	// reset the view
-	glLoadIdentity();
-	return 1;
-}
-
-void Display_Render(SDL_Window *displayWindow) {
-	// clear the screen and the depth buffer
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glColor4f(0, 0, 0, 1.0);
-	glLoadIdentity();
-	glTranslatef(-1.5f, 0.0f, -6.0f);
-	glBegin(GL_TRIANGLES);
-	glVertex3f(0.0f, 1.0f, 0.0f);
-	glVertex3f(-1.0f, -1.0f, 0.0f);
-	glVertex3f(1.0f, -1.0f, 0.0f);
-	glEnd();
-
-	SDL_GL_SwapWindow(displayWindow);
-}
-
-int main(int argc, char *argv[]) {
+int Shex::init() {
 	if(SDL_Init(SDL_INIT_VIDEO) < 0) {
 		std::cerr << "There was an error initializing SDL2: " <<
 			SDL_GetError() << std::endl;
@@ -101,42 +63,31 @@ int main(int argc, char *argv[]) {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, OPENGL_MAJOR_VERSION);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, OPENGL_MINOR_VERSION);
 
-	SDL_Window *displayWindow = SDL_CreateWindow("shex",
+	winw = WIN_WIDTH;
+	winh = WIN_HEIGHT;
+	win = SDL_CreateWindow("shex",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
-
-	if(displayWindow == NULL) {
+		winw, winh, SDL_WINDOW_OPENGL);
+	if(win == NULL) {
 		std::cerr << "There was an error creating the window: " <<
 			SDL_GetError() << std::endl;
 		return 1;
 	}
 
-	SDL_GLContext context = SDL_GL_CreateContext(displayWindow);
-
-	if(context == NULL) {
+	glcontext = SDL_GL_CreateContext(win);
+	if(glcontext == NULL) {
 		std::cerr << "There was an error creating OpenGL context: " <<
 			SDL_GetError() << std::endl;
 		return 1;
 	}
 
-	const unsigned char *version = glGetString(GL_VERSION);
-	if(version == NULL) {
-		std::cerr << "There was an error with OpenGL configuration." <<
-			std::endl;
-		return 1;
-	}
-
-
 	glewExperimental = GL_TRUE;
 	glewInit();
+	SDL_GL_MakeCurrent(win, glcontext);
+	init_gl();
+	set_viewport();
 
-	SDL_GL_MakeCurrent(displayWindow, context);
-	Display_InitGL();
-	Display_SetViewport(SCREEN_WIDTH, SCREEN_HEIGHT);
-//	Display_Render(displayWindow);
-//	SDL_Delay(5000);
-
-	// Create Vertex Array Object:
+/*	// Create Vertex Array Object:
 	GLuint vao;
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
@@ -282,9 +233,24 @@ int main(int argc, char *argv[]) {
 //	Display_Render(displayWindow);
 //	SDL_Delay(2000);
 
+*/
+
+
+/*	glDeleteTextures(sizeof(tex), tex);
+
+	glDeleteProgram(shaderProgram);
+	glDeleteShader(fragmentShader);
+	glDeleteShader(vertexShader);
+
+	glDeleteBuffers(1, &ebo);
+	glDeleteBuffers(1, &vbo);
+	glDeleteVertexArrays(1, &vao);
+*/
+}
+
+void Shex::loop() {
 	SDL_Event e;
 	bool quit = false;
-
 	while(1) {
 		// process events:
 		while(SDL_PollEvent(&e) != 0) {
@@ -294,8 +260,9 @@ int main(int argc, char *argv[]) {
 			if(e.type == SDL_WINDOWEVENT &&
 			(e.window.event ==SDL_WINDOWEVENT_RESIZED ||
 			e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)) {
-				Display_SetViewport(e.window.data1,
-					e.window.data2);
+				winw = e.window.data1;
+				winh = e.window.data2;
+				set_viewport();
 			}
 		}
 		if(quit) break;
@@ -304,7 +271,7 @@ int main(int argc, char *argv[]) {
 //		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		// Draw a triangle from 3 vertices:
-		GLint uniColor = glGetUniformLocation(
+/*		GLint uniColor = glGetUniformLocation(
 					shaderProgram, "triangleColor");
 		glUniform3f(uniColor, 1.0f, 0.0f, 0.0f);
 		// Specify texture:
@@ -312,23 +279,62 @@ int main(int argc, char *argv[]) {
 		glUniform1i(tex_id, 1);
 		// 2nd parameter: number of indices to draw, type, offset
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		SDL_GL_SwapWindow(displayWindow);
+*/
+
+		// draw a square:
+		glBegin(GL_QUADS);
+			glVertex3f(0, 0, 0);
+			glVertex3f(0.5, 0, 0);
+			glVertex3f(0.5, 0.5, 0);
+			glVertex3f(0, 0.5, 0);
+		glEnd();
+		SDL_GL_SwapWindow(win);
 		SDL_Delay(1000); // 1fps
 	}
-
-	glDeleteTextures(sizeof(tex), tex);
-
-	glDeleteProgram(shaderProgram);
-	glDeleteShader(fragmentShader);
-	glDeleteShader(vertexShader);
-
-	glDeleteBuffers(1, &ebo);
-	glDeleteBuffers(1, &vbo);
-	glDeleteVertexArrays(1, &vao);
-
-	SDL_GL_DeleteContext(context);
+	SDL_GL_DeleteContext(glcontext);
 	SDL_Quit();
-	return 0;
 }
 
+void Shex::init_gl() {
+	// enable smooth shading
+	glShadeModel(GL_SMOOTH);
+	// set the background red
+	glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+	// depth buffer setup
+	glClearDepth(1.0f);
+	// enable depth testing
+	glEnable(GL_DEPTH_TEST);
+	// the type of depth test to do
+	glDepthFunc(GL_LEQUAL);
+	// really nice perspective calculations
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+}
+
+// reset viewport after a window resize:
+void Shex::set_viewport() {
+	winh = (winh < 1)? 1: winh;
+//	GLfloat ratio = GLfloat(winw) / GLfloat(winh);
+	glViewport(0, 0, (GLsizei)winw, (GLsizei)winh);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	// set an orthogonal projection:
+	glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+	// make sure we are changing the model view matrix and not projection:
+	glMatrixMode(GL_MODELVIEW);
+	// reset the view:
+	glLoadIdentity();
+}
+
+void Shex::draw() {
+}
+
+int main(int argc, char *argv[]) {
+	Shex shex;
+	int err = shex.init();
+	if(!err) {
+		return err;
+	}
+	shex.loop();
+	return 0;
+}
 
