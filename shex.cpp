@@ -16,7 +16,6 @@
 
 // Shader sources
 const GLchar *vertexSource =
-	"#version 150 core\n"
 	"in vec2 position;"
 	"in vec3 color;"
 	"in vec2 texcoord;"
@@ -46,10 +45,88 @@ private:
 	int winw, winh; // window width and height in pixels
 	SDL_Window *win;
 	SDL_GLContext glcontext;
-	void init_gl();
-	void set_viewport();
-	void draw();
+	GLuint tex[8]; // storage for texture ids
+	GLuint sp_linen; // line number shader program
+	int init_gl(); // OpenGL-specific initializations
+	void set_viewport(); // called after window resize
+	void draw(); // draw window
+	// compile shader given filename and shader type:
+	GLuint compile_shader(const char *shfname, GLenum shtype);
+	// build shader program given file names for vertex and fragment shader:
+	GLuint build_sprogram(GLuint vshader, GLuint fshader);
 };
+
+GLuint Shex::compile_shader(const char *shfname, GLenum shtype) {
+	// load the shader:
+	std::ifstream t(shfname);
+	std::stringstream txtbuf;
+	txtbuf << t.rdbuf();
+	std::string temp_str = txtbuf.str();
+	const GLchar *text_str = temp_str.c_str();
+	// compile the shader:
+	GLuint shader = glCreateShader(shtype);
+	glShaderSource(shader, 1, &text_str, NULL);
+	glCompileShader(shader);
+	GLint status;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+	if(status != GL_TRUE) {
+		char errbuf[512];
+		glGetShaderInfoLog(shader, 512, NULL, errbuf);
+		std::cerr << "Error compiling " << shfname << errbuf <<
+			std::endl;
+		return 0;
+	}
+	return shader;
+}
+
+GLuint Shex::build_sprogram(GLuint vshader, GLuint fshader) {
+	GLuint sprogram = glCreateProgram();
+	// link
+	glAttachShader(sprogram, vshader);
+	glAttachShader(sprogram, fshader);
+	glLinkProgram(sprogram);
+	//glUseProgram(linen_shader);
+	return sprogram;
+}
+
+int Shex::init_gl() {
+	// enable smooth shading
+	glShadeModel(GL_SMOOTH);
+	// set the background red
+	glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+	// depth buffer setup
+	glClearDepth(1.0f);
+	// enable depth testing
+	glEnable(GL_DEPTH_TEST);
+	// the type of depth test to do
+	glDepthFunc(GL_LEQUAL);
+	// really nice perspective calculations
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+
+	glGenTextures(8, tex);
+	// load font:
+	{
+		int x, y, n;
+		unsigned char *data = stbi_load("font.png", &x, &y, &n, 1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, tex[1]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, x, y, 0,
+			GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+						GL_NEAREST);
+	}
+	// load shaders:
+	GLuint vshader = compile_shader("texbox.glsl", GL_VERTEX_SHADER);
+	GLuint linen_shader = compile_shader("linen.glsl", GL_FRAGMENT_SHADER);
+	sp_linen = build_sprogram(vshader, linen_shader);
+
+	// GEOMETRY:
+
+
+	return 0;
+}
 
 int Shex::init() {
 	if(SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -143,20 +220,6 @@ int Shex::init() {
 						GL_LINEAR_MIPMAP_LINEAR);
 	// Create a mipmap:
 	glGenerateMipmap(GL_TEXTURE_2D);
-
-	// FONT:
-	{
-		int x, y, n;
-		unsigned char *data = stbi_load("font.png", &x, &y, &n, 1);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, tex[1]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, x, y, 0,
-			GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-						GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-						GL_NEAREST);
-	}
 
 	// Create and compile the vertex shader:
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -266,6 +329,8 @@ void Shex::loop() {
 			}
 		}
 		if(quit) break;
+		draw();
+		continue;
 		// Clear the screen to black:
 		glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
 //		glClear(GL_COLOR_BUFFER_BIT);
@@ -290,24 +355,10 @@ void Shex::loop() {
 		glEnd();
 		SDL_GL_SwapWindow(win);
 		SDL_Delay(1000); // 1fps
+
 	}
 	SDL_GL_DeleteContext(glcontext);
 	SDL_Quit();
-}
-
-void Shex::init_gl() {
-	// enable smooth shading
-	glShadeModel(GL_SMOOTH);
-	// set the background red
-	glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
-	// depth buffer setup
-	glClearDepth(1.0f);
-	// enable depth testing
-	glEnable(GL_DEPTH_TEST);
-	// the type of depth test to do
-	glDepthFunc(GL_LEQUAL);
-	// really nice perspective calculations
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 }
 
 // reset viewport after a window resize:
@@ -326,6 +377,60 @@ void Shex::set_viewport() {
 }
 
 void Shex::draw() {
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	static const GLfloat vertices[][3] = {
+		{ 0.0,  0.0,  0.0},
+		{ 1.0,  0.0,  0.0},
+		{ 1.0,  1.0,  0.0},
+		{ 0.0,  1.0,  0.0}
+	};
+	static const GLfloat texCoords[] = {
+		0.0, 1.0,
+		1.0, 1.0,
+		1.0, 0.0,
+		0.0, 0.0
+	};
+
+	glLoadIdentity();
+	//glTranslatef(0.0, 0.0, -3.0);
+
+	glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glBindTexture(GL_TEXTURE_2D, tex[1]);
+	glVertexPointer(3, GL_FLOAT, 0, vertices);
+	glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
+	GLint tex_id = glGetUniformLocation(sp_linen, "tex");
+	glUniform1i(tex_id, 1);
+	glUseProgram(sp_linen);
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	SDL_GL_SwapWindow(win);
+	return;
+/*
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_SRC_COLOR);
+	glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glBindTexture(GL_TEXTURE_2D, tex[1]);
+	//glUseProgram(sp_linen);
+	// specify texture:
+	GLint tex_id = glGetUniformLocation(sp_linen, "tex");
+	glUniform1i(tex_id, 1);
+	// draw a box:
+	glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(0, 0, 0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(0.5, 0, 0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(0.5, 0.5, 0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(0, 0.5, 0);
+	glEnd();
+	SDL_GL_SwapWindow(win);
+*/
 }
 
 int main(int argc, char *argv[]) {
