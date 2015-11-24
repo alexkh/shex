@@ -402,8 +402,12 @@ void Shex::draw() {
 	glBindTexture(GL_TEXTURE_2D, tex[1]);
 	glVertexPointer(3, GL_FLOAT, 0, vertices);
 	glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
+	// pass texture to the fragment shader:
 	GLint tex_id = glGetUniformLocation(sp_linen, "tex");
 	glUniform1i(tex_id, 1);
+	// pass window size to the fragment shader:
+	GLint bbox_param = glGetUniformLocation(sp_linen, "bbox");
+	glUniform2f(bbox_param, winw, winh);
 	glUseProgram(sp_linen);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
