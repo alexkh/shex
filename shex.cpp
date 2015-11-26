@@ -163,152 +163,6 @@ int Shex::init() {
 	SDL_GL_MakeCurrent(win, glcontext);
 	init_gl();
 	set_viewport();
-
-/*	// Create Vertex Array Object:
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-	// Create a Vertex Buffer Object and copy the vertex data to it:
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	float vertices[] = {
-		// Position   Color		Texcoords
-		-0.5f,  0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, // Top-left
-		0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 1.0f, 0.0f, // Top-right
-		0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 1.0f, // Bottom-right
-		-0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f  // Bottom-left
-	};
-
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
-		GL_STATIC_DRAW);
-
-	// Create an Element Buffer Object:
-	GLuint ebo;
-	glGenBuffers(1, &ebo);
-	// Element buffer
-	GLuint elements[] = {
-		0, 1, 2,
-		2, 3, 0
-	};
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-		sizeof(elements), elements, GL_STATIC_DRAW);
-
-	// Create a texture:
-	GLuint tex[8];
-	glGenTextures(sizeof(tex), tex);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex[0]);
-	// Black/white checkerboard:
-	float pixels[] = {
-		0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f
-	};
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT,
-									pixels);
-	// Set wrap parameters:
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	// Set borter color to red in case we use GL_CLAMP_TO_BORDER above:
-	float color[] = { 1.0f, 0.0f, 0.0f, 1.0f };
-	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
-	// Specify filtering method:
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-						GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-						GL_LINEAR_MIPMAP_LINEAR);
-	// Create a mipmap:
-	glGenerateMipmap(GL_TEXTURE_2D);
-
-	// Create and compile the vertex shader:
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexSource, NULL);
-	glCompileShader(vertexShader);
-	GLint status;
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
-	if(status != GL_TRUE) {
-		char buffer[512];
-		glGetShaderInfoLog(vertexShader, 512, NULL, buffer);
-		std::cout << "Error compiling vertex shader: " << buffer
-			<< std::endl;
-	}
-	// Create and compile the fragment shader:
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
-	glCompileShader(fragmentShader);
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
-	if(status != GL_TRUE) {
-		char buffer[512];
-		glGetShaderInfoLog(fragmentShader, 512, NULL, buffer);
-		std::cout << "Error compiling fragment shader" << buffer
-			<< std::endl;
-	}
-	// Link the vertex and fragment shader into a shader program
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glBindFragDataLocation(shaderProgram, 0, "outColor");
-	glLinkProgram(shaderProgram);
-	glUseProgram(shaderProgram);
-
-	// load the linen pixel shader:
-	{
-		GLuint linen_shader = glCreateProgram();
-		// load the fragment shader:
-		std::ifstream t("linen.glsl");
-		std::stringstream buffer;
-		buffer << t.rdbuf();
-		const GLchar *text_str = buffer.str().c_str();
-		// compile the fragment shader:
-		GLuint linen_fragment = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(linen_fragment, 1, &text_str, NULL);
-		glCompileShader(linen_fragment);
-		glGetShaderiv(linen_fragment, GL_COMPILE_STATUS, &status);
-		if(status != GL_TRUE) {
-			char errbuf[512];
-			glGetShaderInfoLog(linen_fragment, 512, NULL, errbuf);
-			std::cout << "Error compiling linen.glsl " << errbuf <<
-				std::endl;
-		}
-		// link
-		glAttachShader(linen_shader, vertexShader);
-		glAttachShader(linen_shader, linen_fragment);
-		glLinkProgram(linen_shader);
-		glUseProgram(linen_shader);
-	}
-
-
-	// Specify the layout of the vertex data:
-	GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
-	glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE,
-			7 * sizeof(float), 0);
-	glEnableVertexAttribArray(posAttrib);
-	GLint colAttrib = glGetAttribLocation(shaderProgram, "color");
-	glVertexAttribPointer(colAttrib, 3, GL_FLOAT, GL_FALSE,
-			7 * sizeof(float), (void *)(2 * sizeof(float)));
-	glEnableVertexAttribArray(colAttrib);
-	GLint texAttrib = glGetAttribLocation(shaderProgram, "texcoord");
-	glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE,
-			7 * sizeof(float), (void *)(5 * sizeof(float)));
-	glEnableVertexAttribArray(texAttrib);
-
-//	Display_Render(displayWindow);
-//	SDL_Delay(2000);
-
-*/
-
-
-/*	glDeleteTextures(sizeof(tex), tex);
-
-	glDeleteProgram(shaderProgram);
-	glDeleteShader(fragmentShader);
-	glDeleteShader(vertexShader);
-
-	glDeleteBuffers(1, &ebo);
-	glDeleteBuffers(1, &vbo);
-	glDeleteVertexArrays(1, &vao);
-*/
 }
 
 void Shex::loop() {
@@ -333,18 +187,7 @@ void Shex::loop() {
 		continue;
 		// Clear the screen to black:
 		glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
-//		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		// Draw a triangle from 3 vertices:
-/*		GLint uniColor = glGetUniformLocation(
-					shaderProgram, "triangleColor");
-		glUniform3f(uniColor, 1.0f, 0.0f, 0.0f);
-		// Specify texture:
-		GLint tex_id = glGetUniformLocation(shaderProgram, "tex");
-		glUniform1i(tex_id, 1);
-		// 2nd parameter: number of indices to draw, type, offset
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-*/
 
 		// draw a square:
 		glBegin(GL_QUADS);
@@ -415,26 +258,6 @@ void Shex::draw() {
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	SDL_GL_SwapWindow(win);
 	return;
-/*
-	glEnable(GL_TEXTURE_2D);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_SRC_COLOR);
-	glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glBindTexture(GL_TEXTURE_2D, tex[1]);
-	//glUseProgram(sp_linen);
-	// specify texture:
-	GLint tex_id = glGetUniformLocation(sp_linen, "tex");
-	glUniform1i(tex_id, 1);
-	// draw a box:
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(0, 0, 0);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(0.5, 0, 0);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(0.5, 0.5, 0);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(0, 0.5, 0);
-	glEnd();
-	SDL_GL_SwapWindow(win);
-*/
 }
 
 int main(int argc, char *argv[]) {
