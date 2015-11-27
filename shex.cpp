@@ -8,8 +8,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define WIN_WIDTH 480
-#define WIN_HEIGHT 1040
+#define WIN_WIDTH 360
+#define WIN_HEIGHT 1053
 
 #define OPENGL_MAJOR_VERSION 2
 #define OPENGL_MINOR_VERSION 0
@@ -38,6 +38,7 @@ const GLchar *fragmentSource =
 
 class Shex {
 public:
+	const char *datafname;
 	Shex() {};
 	int init();
 	void loop();
@@ -46,6 +47,7 @@ private:
 	SDL_Window *win;
 	SDL_GLContext glcontext;
 	GLuint tex[8]; // storage for texture ids
+	size_t datalen; // length of data actually stored in data texture
 	GLuint sp_linen; // line number shader program
 	int init_gl(); // OpenGL-specific initializations
 	void set_viewport(); // called after window resize
@@ -122,7 +124,22 @@ int Shex::init_gl() {
 	GLuint linen_shader = compile_shader("linen.glsl", GL_FRAGMENT_SHADER);
 	sp_linen = build_sprogram(vshader, linen_shader);
 
-	// GEOMETRY:
+	// load data file:
+	{
+		char buffer[4096]; // 4096 = 64x64 1byte-per-pixel tex
+		std::ifstream t(datafname, std::ios::in | std::ios::binary);
+		t.read(buffer, 4096);
+		datalen = t.gcount();
+//		std::cout << "DATA: " << datalen << buffer << std::endl;
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, tex[2]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 64, 64, 0,
+			GL_LUMINANCE, GL_UNSIGNED_BYTE, buffer);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+						GL_NEAREST);
+	}
 
 
 	return 0;
@@ -184,21 +201,6 @@ void Shex::loop() {
 		}
 		if(quit) break;
 		draw();
-		continue;
-		// Clear the screen to black:
-		glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		// draw a square:
-		glBegin(GL_QUADS);
-			glVertex3f(0, 0, 0);
-			glVertex3f(0.5, 0, 0);
-			glVertex3f(0.5, 0.5, 0);
-			glVertex3f(0, 0.5, 0);
-		glEnd();
-		SDL_GL_SwapWindow(win);
-		SDL_Delay(1000); // 1fps
-
 	}
 	SDL_GL_DeleteContext(glcontext);
 	SDL_Quit();
@@ -242,12 +244,17 @@ void Shex::draw() {
 	glClearColor(0.0f, 0.5f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glBindTexture(GL_TEXTURE_2D, tex[1]);
+//	glBindTexture(GL_TEXTURE_2D, tex[1]);
 	glVertexPointer(3, GL_FLOAT, 0, vertices);
 	glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
-	// pass texture to the fragment shader:
+	// pass font texture to the fragment shader:
 	GLint tex_id = glGetUniformLocation(sp_linen, "tex");
 	glUniform1i(tex_id, 1);
+	// pass data texture to the fragment shader:
+	GLint datatex_id = glGetUniformLocation(sp_linen, "datatex");
+	glUniform1i(datatex_id, 2);
+	GLint datalen_id = glGetUniformLocation(sp_linen, "datalen");
+	glUniform1i(datalen_id, datalen);
 	// pass window size to the fragment shader:
 	GLint bbox_param = glGetUniformLocation(sp_linen, "bbox");
 	glUniform2f(bbox_param, winw, winh);
@@ -261,7 +268,13 @@ void Shex::draw() {
 }
 
 int main(int argc, char *argv[]) {
+	if(argc < 2) {
+		std::cerr << "Hex viewer. Usage: " << std::endl <<
+			argv[0] << " filename" << std::endl;
+		return 1;
+	}
 	Shex shex;
+	shex.datafname = argv[1];
 	int err = shex.init();
 	if(!err) {
 		return err;
