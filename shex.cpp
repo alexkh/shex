@@ -109,7 +109,8 @@ int Shex::init_gl() {
 	// load font:
 	{
 		int x, y, n;
-		unsigned char *data = stbi_load("font.png", &x, &y, &n, 1);
+		unsigned char *data = stbi_load(
+			"/usr/share/shex/font.png", &x, &y, &n, 1);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, tex[1]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, x, y, 0,
@@ -120,8 +121,10 @@ int Shex::init_gl() {
 						GL_NEAREST);
 	}
 	// load shaders:
-	GLuint vshader = compile_shader("texbox.glsl", GL_VERTEX_SHADER);
-	GLuint linen_shader = compile_shader("linen.glsl", GL_FRAGMENT_SHADER);
+	GLuint vshader = compile_shader(
+		"/usr/share/shex/texbox.glsl", GL_VERTEX_SHADER);
+	GLuint linen_shader = compile_shader(
+		"/usr/share/shex/linen.glsl", GL_FRAGMENT_SHADER);
 	sp_linen = build_sprogram(vshader, linen_shader);
 
 	// load data file:

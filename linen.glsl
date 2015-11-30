@@ -37,15 +37,15 @@ void mainbox(int bxo, int dyo, int dataoffset) {
 	float hexval = texval.r * 256.0;
 	int digit = int((mod(floor(bxo / 6.0), 2.0) == 0.0)?
 		floor(hexval / 16.0): mod(hexval, 16.0));
-	vec4 col = vec4(0.0, 1.0, 0.0, 1.0);
+	vec4 col = vec4(0.8, 0.8, 0.0, 1.0);
 	if(hexval == 0) {
-		col = vec4(0.0, 0.3, 0.3, 1.0);
-	} else if(hexval < 64) {
-		col = vec4(0.0, 0.35, 0.0, 1.0);
+		col = vec4(0.0, 0.0, 0.9, 1.0);
+	} else if(hexval < 32) {
+		col = vec4(0.0, 0.6, 0.6, 1.0);
 	} else if(hexval < 128) {
-		col = vec4(0.0, 0.5, 0.0, 1.0);
+		col = vec4(0.8, 0.8, 0.8, 1.0);
 	} else if(hexval < 192) {
-		col = vec4(0.0, 0.75, 0.0, 1.0);
+		col = vec4(1.0, 0.5, 0.0, 1.0);
 	}
 	print_digit(digit, int(mod(bxo, 6)), dyo, col, 1.0);
 }
@@ -57,13 +57,20 @@ void asciibox(int bxo, int dyo, int dataoffset) {
 	int val = int(texval.r * 256.0);
 	vec4 col = vec4(0.8, 0.8, 0.8, 1.0);
 	if(val < 32) {
-		col = vec4(0.0, 0.6, 0.0, 1.0);
+		col = vec4(0.0, 0.6, 0.6, 1.0);
 	}
-	if(val > 127 || val == 0) {
+	if(val == 0) {
+		col = vec4(0.0, 0.0, 0.9, 1.0);
+	}
+	if(val > 127 && val < 192) {
 		val = 127;
-		col = vec4(0.0, 0.3, 0.3, 1.0);
+		col = vec4(1.0, 0.5, 0.0, 1.0);
 	}
-	if(val > -1 && val < 128) {
+	if(val > 191) {
+		val = 127;
+		col = vec4(0.8, 0.8, 0.0, 1.0);
+	}
+	if(val > -1 && val < 256) {
 		print_ascii(val, int(mod(bxo, 6)), dyo, col, 1.0);
 	}
 }
@@ -88,7 +95,7 @@ void main() {
 		float base = pow(16.0, (3.0 - floor(co.x / 6)));
 		int digit = int(mod(floor((linen * 16) / base), 16));
 		int dxo = int(mod(co.x, 6.0));//offset within digit:dig x offset
-		print_digit(digit, dxo, py, vec4(0.3, 0.3, 0.3, 1.0), -1.0);
+		print_digit(digit, dxo, py, vec4(0.0, 0.8, 0.0, 1.0), -1.0);
 	} else
 
 	// hex data values in the main box:
@@ -132,7 +139,7 @@ void main() {
 //	gl_FragColor = vec4(0.0, 0.1 * linen_mod10, 0.0, 1.0);
 
 	if(co.y >= 0 && mod(linen, 2) == 0) {
-		gl_FragColor = mix(vec4(0.3, 0.4, 0.3, 1.0), gl_FragColor,
+		gl_FragColor = mix(vec4(0.5, 0.6, 0.5, 1.0), gl_FragColor,
 			0.8);
 	}
 
