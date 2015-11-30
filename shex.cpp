@@ -190,7 +190,7 @@ void Shex::loop() {
 	bool quit = false;
 	while(1) {
 		// process events:
-		while(SDL_PollEvent(&e) != 0) {
+		while(SDL_WaitEvent(&e) != 0) {
 			if(e.type == SDL_QUIT) {
 				quit = true;
 			}
@@ -201,9 +201,10 @@ void Shex::loop() {
 				winh = e.window.data2;
 				set_viewport();
 			}
+			if(quit) break;
+			draw();
 		}
 		if(quit) break;
-		draw();
 	}
 	SDL_GL_DeleteContext(glcontext);
 	SDL_Quit();
