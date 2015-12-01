@@ -39,7 +39,7 @@ const GLchar *fragmentSource =
 class Shex {
 public:
 	const char *datafname;
-	Shex() {};
+	Shex() : dfsize(0), doffset(0) {};
 	int init();
 	void loop();
 private:
@@ -48,6 +48,8 @@ private:
 	SDL_GLContext glcontext;
 	GLuint tex[8]; // storage for texture ids
 	size_t datalen; // length of data actually stored in data texture
+	size_t dfsize; // data file size
+	size_t doffset; // data file offset
 	GLuint sp_linen; // line number shader program
 	int init_gl(); // OpenGL-specific initializations
 	void set_viewport(); // called after window resize
@@ -56,6 +58,7 @@ private:
 	GLuint compile_shader(const char *shfname, GLenum shtype);
 	// build shader program given file names for vertex and fragment shader:
 	GLuint build_sprogram(GLuint vshader, GLuint fshader);
+	int load_data_file(); // (re)load data at doffset, 0 = success
 };
 
 GLuint Shex::compile_shader(const char *shfname, GLenum shtype) {
@@ -89,6 +92,30 @@ GLuint Shex::build_sprogram(GLuint vshader, GLuint fshader) {
 	glLinkProgram(sprogram);
 	//glUseProgram(linen_shader);
 	return sprogram;
+}
+
+int Shex::load_data_file() {
+	char buffer[4096]; // 4096 = 64x64 1byte-per-pixel tex
+	std::ifstream t(datafname, std::ios::in | std::ios::binary);
+	// if dfsize is zero, determine the file size:
+	if(!dfsize) {
+		t.seekg(0, t.end);
+		dfsize = t.tellg();
+		t.seekg(0, t.beg);
+	}
+	t.seekg(doffset, t.beg);
+	t.read(buffer, 4096);
+	datalen = t.gcount();
+	glActiveTexture(GL_TEXTURE2);
+	// TODO: glDeleteTexture(1, tex[2]); glGenTextures(1, tex[2]);
+	glBindTexture(GL_TEXTURE_2D, tex[2]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 64, 64, 0,
+		GL_LUMINANCE, GL_UNSIGNED_BYTE, buffer);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+					GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+					GL_NEAREST);
+	return 0;
 }
 
 int Shex::init_gl() {
@@ -127,23 +154,12 @@ int Shex::init_gl() {
 		"/usr/share/shex/linen.glsl", GL_FRAGMENT_SHADER);
 	sp_linen = build_sprogram(vshader, linen_shader);
 
-	// load data file:
-	{
-		char buffer[4096]; // 4096 = 64x64 1byte-per-pixel tex
-		std::ifstream t(datafname, std::ios::in | std::ios::binary);
-		t.read(buffer, 4096);
-		datalen = t.gcount();
-//		std::cout << "DATA: " << datalen << buffer << std::endl;
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, tex[2]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 64, 64, 0,
-			GL_LUMINANCE, GL_UNSIGNED_BYTE, buffer);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-						GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-						GL_NEAREST);
+	// load the data file at the beginning:
+	if(load_data_file()) {
+		std::cerr << "There was an error loading file " << datafname
+			<< std::endl;
+		return 1;
 	}
-
 
 	return 0;
 }
@@ -181,8 +197,11 @@ int Shex::init() {
 	glewExperimental = GL_TRUE;
 	glewInit();
 	SDL_GL_MakeCurrent(win, glcontext);
-	init_gl();
+	if(init_gl()) {
+		return 1;
+	}
 	set_viewport();
+	return 0;
 }
 
 void Shex::loop() {
@@ -200,6 +219,40 @@ void Shex::loop() {
 				winw = e.window.data1;
 				winh = e.window.data2;
 				set_viewport();
+			}
+			if(e.type == SDL_MOUSEWHEEL) {
+				if(e.wheel.y < 0) {
+					doffset += 16;
+				} else {
+					if(doffset < 16) {
+						doffset = 0;
+					} else {
+						doffset -= 16;
+					}
+				}
+				load_data_file();
+//				std::cout << e.wheel.y << std::endl;
+			}
+			if(e.type == SDL_KEYDOWN) {
+				switch(e.key.keysym.sym) {
+				case SDLK_HOME:
+					doffset = 0;
+					load_data_file();
+					break;
+				case SDLK_END:
+					doffset = (dfsize - dfsize % 16);
+					load_data_file();
+					break;
+				case SDLK_PAGEUP:
+					doffset = (doffset < 400)? 0:
+							doffset - 400;
+					load_data_file();
+					break;
+				case SDLK_PAGEDOWN:
+					doffset += 400;
+					load_data_file();
+					break;
+				}
 			}
 			if(quit) break;
 			draw();
@@ -259,6 +312,9 @@ void Shex::draw() {
 	glUniform1i(datatex_id, 2);
 	GLint datalen_id = glGetUniformLocation(sp_linen, "datalen");
 	glUniform1i(datalen_id, datalen);
+	// pass data offset:
+	GLint doffset_id = glGetUniformLocation(sp_linen, "doffset");
+	glUniform1i(doffset_id, doffset);
 	// pass window size to the fragment shader:
 	GLint bbox_param = glGetUniformLocation(sp_linen, "bbox");
 	glUniform2f(bbox_param, winw, winh);
@@ -280,7 +336,7 @@ int main(int argc, char *argv[]) {
 	Shex shex;
 	shex.datafname = argv[1];
 	int err = shex.init();
-	if(!err) {
+	if(err) {
 		return err;
 	}
 	shex.loop();

@@ -3,6 +3,7 @@ uniform vec2 bbox; // bounding box
 uniform sampler2D tex; // font texture
 uniform sampler2D datatex; // data values texture
 uniform int datalen; // length of data inside data texture
+uniform int doffset; // offset from the beginning of data file
 
 // output a hexadecimal digit's pixel dxo, dyo, colored by color and
 // blend factor blend. if blend is -1.0, then texture's red at that point
@@ -92,10 +93,12 @@ void main() {
 
 	// offset values on the left:
 	if(co.y >= 0 && co.x < 24.0) {
+		if(linen * 16 <= datalen) {
 		float base = pow(16.0, (3.0 - floor(co.x / 6)));
-		int digit = int(mod(floor((linen * 16) / base), 16));
+		int digit = int(mod(floor((linen * 16 + doffset) / base), 16));
 		int dxo = int(mod(co.x, 6.0));//offset within digit:dig x offset
 		print_digit(digit, dxo, py, vec4(0.0, 0.8, 0.0, 1.0), -1.0);
+		}
 	} else
 
 	// hex data values in the main box:
