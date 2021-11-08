@@ -1,4 +1,4 @@
-# shex
+# shex: SHader + HEX
 Hex viewer for Linux using Vulkan via GLFW3
 
 This GUI program is written in C++ and requires hardware that supports Vulkan.
