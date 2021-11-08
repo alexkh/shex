@@ -1722,6 +1722,8 @@ private:
 			app->ifile_view_offset =
 			double(app->scrollbar_initial_ifile_view_offset) +
 				dy * (double(app->ifile_size) / 1008);
+			app->ifile_view_offset = (app->ifile_view_offset / 16)
+					* 16;
 			if(app->ifile_view_offset < 0) {
 				app->ifile_view_offset = 0;
 			}
