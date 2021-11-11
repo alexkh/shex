@@ -1,10 +1,14 @@
-glslangValidator -V shader.vert
+glslangValidator -V shader.vert -o vert.spv.0
+spirv-opt -O vert.spv.0 -o vert.spv
+rm vert.spv.0
 xxd -i -g 4 vert.spv > ../vert.h
 tail -n +2 ../vert.h > vert.h.tmp
 head -n -2 vert.h.tmp > ../vert.h
 rm vert.h.tmp
 
-glslangValidator -V shader.frag
+glslangValidator -V shader.frag -o frag.spv.0
+spirv-opt -O frag.spv.0 -o ./frag.spv
+rm frag.spv.0
 xxd -i -g 4 frag.spv > ../frag.h
 tail -n +2 ../frag.h > frag.h.tmp
 head -n -2 frag.h.tmp > ../frag.h

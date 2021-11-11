@@ -209,12 +209,15 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	std::vector<VkSemaphore> renderFinishedSemaphores;
 	std::vector<VkFence> inFlightFences;
-	std::vector<VkFence> imagesInFlight;
+//	vkAcquireNextImageKHR never returns an image index, that are already presented or queued to be presented.
+//	So there is no need to wait for an image index, just for a concurrent frame index
+//	std::vector<VkFence> imagesInFlight;
+
 	size_t currentFrame = 0;
 
 	bool framebufferResized = false;
 	bool scrollbar_dragged = false; // mouse pressed the scroll bar
-	
+
 	double scrollbar_initial_y = 0; // mouse y when scrollbar was pressed
 	int64_t scrollbar_initial_ifile_view_offset = 0; // offset at start
 
@@ -318,15 +321,16 @@ private:
 	}
 
 	static void start_scrolling(GLFWwindow* window, int64_t step) {
-		Application *app = reinterpret_cast<Application *> (
+		Application *app = static_cast<Application *> (
 				glfwGetWindowUserPointer(window));
 		app->current_scroll_step = step;
 		scroll_one_step(window);
+//		Using std::chrono::steady_clock instead of std::chrono::high_resolution_clock for better performance and to ensure the clock to be steady
 		app->next_scroll_ms = std::chrono::duration_cast
 			<std::chrono::milliseconds>(
 			std::chrono::time_point_cast
 			<std::chrono::milliseconds>(
-			std::chrono::high_resolution_clock::now())
+			std::chrono::steady_clock::now())
 			.time_since_epoch()).count() + app->autorepeat_delay;
 	}
 
@@ -461,7 +465,8 @@ private:
 		while(!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
 			drawFrame();
-			usleep(100000);
+//			Use VSYNC instead of usleep
+//			usleep(100000);
 		}
 
 		vkDeviceWaitIdle(device);
@@ -1601,7 +1606,7 @@ private:
 		imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-		imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
+//		imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
 
 		VkSemaphoreCreateInfo semaphoreInfo = {};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1626,9 +1631,9 @@ private:
 
 	void updateUniformBuffer(uint32_t currentImage) {
 		static auto startTime =
-				std::chrono::high_resolution_clock::now();
+				std::chrono::steady_clock::now();
 
-		auto currentTime = std::chrono::high_resolution_clock::now();
+		auto currentTime = std::chrono::steady_clock::now();
 		float time = std::chrono::duration<float,
 		std::chrono::seconds::period>(currentTime - startTime).count();
 
@@ -1695,7 +1700,7 @@ private:
 	}
 
 	void drawFrame() {
-		Application *app = reinterpret_cast<Application *> (
+		Application *app = static_cast<Application *> (
 				glfwGetWindowUserPointer(window));
 
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame],
@@ -1706,7 +1711,7 @@ private:
 			<std::chrono::milliseconds>(
 			std::chrono::time_point_cast
 			<std::chrono::milliseconds>(
-			std::chrono::high_resolution_clock::now())
+			std::chrono::steady_clock::now())
 			.time_since_epoch()).count();
 		if(app->next_scroll_ms && now_ms >= app->next_scroll_ms) {
 			scroll_one_step(window);
@@ -1744,11 +1749,11 @@ private:
 
 		updateUniformBuffer(imageIndex);
 
-		if(imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-			vkWaitForFences(device, 1, &imagesInFlight[imageIndex],
-					VK_TRUE, UINT64_MAX);
-		}
-		imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+//		if(imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+//			vkWaitForFences(device, 1, &imagesInFlight[imageIndex],
+//					VK_TRUE, UINT64_MAX);
+//		}
+//		imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1835,13 +1840,13 @@ private:
 
 	VkPresentModeKHR chooseSwapPresentMode(
 		const std::vector<VkPresentModeKHR>& availablePresentModes) {
-		for(const auto& availablePresentMode : availablePresentModes) {
-			if(availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR){
-				return availablePresentMode;
-			}
-		}
-
-		return VK_PRESENT_MODE_FIFO_KHR;
+//		for(const auto& availablePresentMode : availablePresentModes) {
+//			if(availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR){
+//				return availablePresentMode;
+//			}
+//		}
+		static_cast<void>(availablePresentModes);
+		return VK_PRESENT_MODE_FIFO_KHR; // VK_PRESENT_MODE_FIFO_KHR is always available
 	}
 
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR&
