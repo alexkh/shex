@@ -216,7 +216,8 @@ private:
 	size_t currentFrame = 0;
 
 	bool framebufferResized = false;
-	bool scrollbar_dragged = false; // mouse pressed the scroll bar
+	bool scrollbar_dragged = false; // mouse pressed the scroll bar => redraw
+	bool dirty = true; // force redraw
 
 	double scrollbar_initial_y = 0; // mouse y when scrollbar was pressed
 	int64_t scrollbar_initial_ifile_view_offset = 0; // offset at start
@@ -233,6 +234,7 @@ private:
 
 	int64_t autorepeat_delay = 180;
 	int64_t autorepeat_rate = 60;
+
 
 	// loads a chunk of input file: returns size actually loaded
 	size_t load_chunk(const char *fname, size_t offset,
@@ -262,8 +264,9 @@ private:
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr,
-				nullptr);
+		std::string window_title = std::string(input_fname) + " - shex";
+		window = glfwCreateWindow(WIDTH, HEIGHT, window_title.c_str(),
+				nullptr, nullptr);
 		glfwSetWindowUserPointer(window, this);
 		glfwSetFramebufferSizeCallback(window,
 				framebufferResizeCallback);
@@ -277,6 +280,7 @@ private:
 		auto app = reinterpret_cast<Application*>(
 				glfwGetWindowUserPointer(window));
 		app->framebufferResized = true;
+		app->dirty = true;
 	}
 
 	void initVulkan() {
@@ -312,11 +316,16 @@ private:
 					-app->current_scroll_step) {
 				app->ifile_view_offset +=
 					app->current_scroll_step;
+				app->dirty = true;
 			} else {
-				app->ifile_view_offset = 0;
+				if(app->ifile_view_offset) {
+					app->ifile_view_offset = 0;
+					app->dirty = true;
+				}
 			}
 		} else {
 			app->ifile_view_offset += app->current_scroll_step;
+			app->dirty = true;
 		}
 	}
 
@@ -377,10 +386,12 @@ private:
 				break;
 			case GLFW_KEY_HOME:
 				app->ifile_view_offset = 0;
+				app->dirty = true;
 				break;
 			case GLFW_KEY_END:
 				app->ifile_view_offset = app->ifile_size > 1184?
 						app->ifile_size - 1184: 0;
+				app->dirty = true;
 				break;
 			case GLFW_KEY_UP:
 				start_scrolling(window, -16);
@@ -391,6 +402,7 @@ private:
 			}
 			if(app->ifile_view_offset < 0) {
 				app->ifile_view_offset = 0;
+				app->dirty = true;
 			}
 		} else if(action == GLFW_RELEASE) {
 			switch(key) {
@@ -419,6 +431,7 @@ private:
 		if(app->ifile_view_offset < 0) {
 			app->ifile_view_offset = 0;
 		}
+		app->dirty = true;
 	}
 
 	static void btn_callback(GLFWwindow *window, int button, int action,
@@ -444,7 +457,7 @@ private:
 					app->ifile_view_offset) /
 					double(app->ifile_size)) *
 					(1048.0 - scrollbar_size)) + 15.0;
-				std::cout << scrollbar_pos << "\n";
+				// std::cout << scrollbar_pos << "\n";
 				if(xpos > 2 && xpos < 11 &&
 						ypos > scrollbar_pos
 						&& ypos < (scrollbar_pos +
@@ -464,12 +477,14 @@ private:
 	void mainLoop() {
 		while(!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
-			drawFrame();
-//			Use VSYNC instead of usleep
-//			usleep(100000);
-		}
 
-		vkDeviceWaitIdle(device);
+			if(dirty || scrollbar_dragged) {
+				drawFrame();
+				// std::cout << "drawing frame\n";
+			} else {
+				usleep(10000);
+			}
+		}
 	}
 
 	void cleanupSwapChain() {
@@ -500,6 +515,8 @@ private:
 	}
 
 	void cleanup() {
+		vkDeviceWaitIdle(device);
+
 		cleanupSwapChain();
 
 		vkDestroySampler(device, textureSampler, nullptr);
@@ -1806,6 +1823,7 @@ private:
 		}
 
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+		dirty = false;
 	}
 
 	VkShaderModule createShaderModule(const std::vector<uint8_t>& code) {
@@ -2070,7 +2088,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	std::cout << sizeof(fixed6x13) << "\n";
+	// std::cout << sizeof(fixed6x13) << "\n";
 
 	return EXIT_SUCCESS;
 }
