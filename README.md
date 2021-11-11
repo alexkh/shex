@@ -8,12 +8,13 @@ To build: type inside the shex/ directory:
 
 make
 
-If you modify the shaders/shader.frag, then you will need to rebuild it.
+If you modify the shaders/shader.frag, or shaders/shader.vert then you will need to rebuild it.
 Just type:
 
 make shaders
 
-after that shaders/frag.spv and shaders/vert.spv will be regenerated, and automatically executable will be recompiled
+after that shaders/frag.spv and shaders/vert.spv will be regenerated.
+There is no need to rebuild an executable after shader changes.
 
 To test: run the executable file with any binary file as parameter
 

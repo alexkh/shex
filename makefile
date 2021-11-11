@@ -14,6 +14,5 @@ win:
 shaders:
 	@echo "	MAKE shaders"
 	@cd shaders && make
-	@make all
 
 .PHONY: all clean win shaders
