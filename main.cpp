@@ -478,6 +478,19 @@ private:
 		while(!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
 
+			// update the keyboard autorepeat scrolling
+			int64_t now_ms = std::chrono::duration_cast
+				<std::chrono::milliseconds>(
+				std::chrono::time_point_cast
+				<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now())
+				.time_since_epoch()).count();
+			if(next_scroll_ms && now_ms >= next_scroll_ms) {
+				scroll_one_step(window);
+				next_scroll_ms =
+					now_ms + autorepeat_rate;
+			}
+
 			if(dirty || scrollbar_dragged) {
 				drawFrame();
 				// std::cout << "drawing frame\n";
@@ -1722,18 +1735,6 @@ private:
 
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame],
 				VK_TRUE, UINT64_MAX);
-
-		// update the keyboard autorepeat scrolling
-		int64_t now_ms = std::chrono::duration_cast
-			<std::chrono::milliseconds>(
-			std::chrono::time_point_cast
-			<std::chrono::milliseconds>(
-			std::chrono::steady_clock::now())
-			.time_since_epoch()).count();
-		if(app->next_scroll_ms && now_ms >= app->next_scroll_ms) {
-			scroll_one_step(window);
-			app->next_scroll_ms = now_ms + app->autorepeat_rate;
-		}
 
 		// update dragging of the scroll bar with left mouse button
 		if(app->scrollbar_dragged) {
