@@ -491,7 +491,27 @@ private:
 					now_ms + autorepeat_rate;
 			}
 
-			if(dirty || scrollbar_dragged) {
+			// update dragging of the scroll bar with left mouse btn
+			if(scrollbar_dragged) {
+				double xpos, ypos;
+				glfwGetCursorPos(window, &xpos, &ypos);
+				double dy = ypos - scrollbar_initial_y;
+				size_t old_offset = ifile_view_offset;
+				// one pixel corresponds to ifile_size / 1048
+				ifile_view_offset =
+				double(scrollbar_initial_ifile_view_offset) +
+					dy * (double(ifile_size) / 1048.0);
+				ifile_view_offset =
+					(ifile_view_offset / 16) * 16;
+				if(ifile_view_offset < 0) {
+					ifile_view_offset = 0;
+				}
+				if(ifile_view_offset != old_offset) {
+					dirty = true;
+				}
+			}
+
+			if(dirty) {
 				drawFrame();
 				// std::cout << "drawing frame\n";
 			} else {
@@ -1735,22 +1755,6 @@ private:
 
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame],
 				VK_TRUE, UINT64_MAX);
-
-		// update dragging of the scroll bar with left mouse button
-		if(app->scrollbar_dragged) {
-			double xpos, ypos;
-			glfwGetCursorPos(window, &xpos, &ypos);
-			double dy = ypos - app->scrollbar_initial_y;
-			// one pixel corresponds to ifile_size / 1048
-			app->ifile_view_offset =
-			double(app->scrollbar_initial_ifile_view_offset) +
-				dy * (double(app->ifile_size) / 1008);
-			app->ifile_view_offset = (app->ifile_view_offset / 16)
-					* 16;
-			if(app->ifile_view_offset < 0) {
-				app->ifile_view_offset = 0;
-			}
-		}
 
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(device, swapChain,
