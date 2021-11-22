@@ -487,50 +487,7 @@ private:
 					break;
 				}
 			}
-<<<<<<< HEAD
 			if(quitting) break;
-=======
-		}
-	}
-
-	void mainLoop() {
-		while(!glfwWindowShouldClose(window)) {
-			glfwPollEvents();
-
-			// update the keyboard autorepeat scrolling
-			int64_t now_ms = std::chrono::duration_cast
-				<std::chrono::milliseconds>(
-				std::chrono::time_point_cast
-				<std::chrono::milliseconds>(
-				std::chrono::steady_clock::now())
-				.time_since_epoch()).count();
-			if(next_scroll_ms && now_ms >= next_scroll_ms) {
-				scroll_one_step(window);
-				next_scroll_ms =
-					now_ms + autorepeat_rate;
-			}
-
-			// update dragging of the scroll bar with left mouse btn
-			if(scrollbar_dragged) {
-				double xpos, ypos;
-				glfwGetCursorPos(window, &xpos, &ypos);
-				double dy = ypos - scrollbar_initial_y;
-				size_t old_offset = ifile_view_offset;
-				// one pixel corresponds to ifile_size / 1048
-				ifile_view_offset =
-				double(scrollbar_initial_ifile_view_offset) +
-					dy * (double(ifile_size) / 1048.0);
-				ifile_view_offset =
-					(ifile_view_offset / 16) * 16;
-				if(ifile_view_offset < 0) {
-					ifile_view_offset = 0;
-				}
-				if(ifile_view_offset != old_offset) {
-					dirty = true;
-				}
-			}
-
->>>>>>> 295655384618a3b866ab2cff33eca5c29ffb06e5
 			if(dirty) {
 				drawFrame();
 			}
@@ -1771,7 +1728,6 @@ private:
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame],
 				VK_TRUE, UINT64_MAX);
 
-<<<<<<< HEAD
 		// update the keyboard autorepeat scrolling
 		int64_t now_ms = std::chrono::duration_cast
 			<std::chrono::milliseconds>(
@@ -1784,8 +1740,6 @@ private:
 			next_scroll_ms = now_ms + autorepeat_rate;
 		}
 
-=======
->>>>>>> 295655384618a3b866ab2cff33eca5c29ffb06e5
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(device, swapChain,
 				UINT64_MAX, imageAvailableSemaphores[
