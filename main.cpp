@@ -1,5 +1,7 @@
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_vulkan.h>
+#include <SDL2/SDL_syswm.h>
+#include <vulkan/vulkan.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -162,7 +164,7 @@ public:
 	}
 
 private:
-	GLFWwindow* window;
+	SDL_Window* window;
 
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
@@ -215,6 +217,9 @@ private:
 
 	size_t currentFrame = 0;
 
+	int window_w = 0; // current window width
+	int window_h = 0;
+
 	bool framebufferResized = false;
 	bool scrollbar_dragged = false; // mouse pressed the scroll bar => redraw
 	bool dirty = true; // force redraw
@@ -260,27 +265,26 @@ private:
 	}
 
 	void initWindow() {
-		glfwInit();
-
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		SDL_Init(SDL_INIT_VIDEO);
 
 		std::string window_title = std::string(input_fname) + " - shex";
-		window = glfwCreateWindow(WIDTH, HEIGHT, window_title.c_str(),
-				nullptr, nullptr);
-		glfwSetWindowUserPointer(window, this);
-		glfwSetFramebufferSizeCallback(window,
-				framebufferResizeCallback);
-		glfwSetScrollCallback(window, scroll_callback);
-		glfwSetKeyCallback(window, key_callback);
-		glfwSetMouseButtonCallback(window, btn_callback);
-	}
 
-	static void framebufferResizeCallback(GLFWwindow* window, int width,
-			int height) {
-		auto app = reinterpret_cast<Application*>(
-				glfwGetWindowUserPointer(window));
-		app->framebufferResized = true;
-		app->dirty = true;
+		window = SDL_CreateWindow(window_title.c_str(), 0, 0,
+				WIDTH, HEIGHT,
+				SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+
+/*
+		SDL_SysWMinfo info;
+		if(SDL_GetWindowWMInfo(window, &info)) {
+			if(info.subsystem == SDL_SYSWM_WAYLAND) {
+				std::cout << "Wayland\n";
+				struct wl_display* display = info.info.wl.display;
+				struct wl_surface* surface = info.info.wl.surface;
+				struct wl_shell_surface* shell_surface =
+						info.info.wl.shell_surface;
+			}
+		}
+*/
 	}
 
 	void initVulkan() {
@@ -308,169 +312,184 @@ private:
 		createSyncObjects();
 	}
 
-	static void scroll_one_step(GLFWwindow *window) {
-		Application *app = reinterpret_cast<Application *> (
-				glfwGetWindowUserPointer(window));
-		if(app->current_scroll_step < 0) {
-			if(app->ifile_view_offset >
-					-app->current_scroll_step) {
-				app->ifile_view_offset +=
-					app->current_scroll_step;
-				app->dirty = true;
+	void scroll_one_step(int64_t step) {
+		if(step < 0) {
+			if(ifile_view_offset > -step) {
+				ifile_view_offset += step;
+				dirty = true;
 			} else {
-				if(app->ifile_view_offset) {
-					app->ifile_view_offset = 0;
-					app->dirty = true;
+				if(ifile_view_offset) {
+					ifile_view_offset = 0;
+					dirty = true;
 				}
 			}
 		} else {
-			app->ifile_view_offset += app->current_scroll_step;
-			app->dirty = true;
+			ifile_view_offset += step;
+			dirty = true;
 		}
 	}
 
-	static void start_scrolling(GLFWwindow* window, int64_t step) {
-		Application *app = static_cast<Application *> (
-				glfwGetWindowUserPointer(window));
-		app->current_scroll_step = step;
-		scroll_one_step(window);
-//		Using std::chrono::steady_clock instead of std::chrono::high_resolution_clock for better performance and to ensure the clock to be steady
-		app->next_scroll_ms = std::chrono::duration_cast
-			<std::chrono::milliseconds>(
-			std::chrono::time_point_cast
-			<std::chrono::milliseconds>(
-			std::chrono::steady_clock::now())
-			.time_since_epoch()).count() + app->autorepeat_delay;
+	void on_left_btn_pressed(const SDL_Event *e) {
+		// check if scrollbar is being pressed
+		double xpos = e->button.x, ypos = e->button.y;
+		// calculate scrollbar size:
+		// window contains 1200 bytes
+		// and scrollbar available height is 1048 pixels
+		double scrollbar_size = (1200.0 / double(ifile_size)) * 1048.0;
+		// minimum scrollbar size is 40 pixels
+		if(scrollbar_size < 40) {
+			scrollbar_size = 40;
+		}
+		// calculate current scrollbar vert. position:
+		double scrollbar_pos = ((double(ifile_view_offset) /
+				double(ifile_size)) *
+				(1048.0 - scrollbar_size)) + 15.0;
+		// std::cout << scrollbar_pos << "\n";
+		if(xpos > 2 && xpos < 11 && ypos > scrollbar_pos
+				&& ypos < (scrollbar_pos + scrollbar_size)) {
+			scrollbar_dragged = true;
+			scrollbar_initial_y = ypos;
+			scrollbar_initial_ifile_view_offset = ifile_view_offset;
+		}
 	}
 
-	static void stop_scrolling(GLFWwindow *window) {
-		Application *app = reinterpret_cast<Application *> (
-				glfwGetWindowUserPointer(window));
-		app->current_scroll_step = 0;
-		app->next_scroll_ms = 0;
-	}
-
-	static void key_callback(GLFWwindow *window, int key, int scancode,
-			int action, int mods) {
-		int neg = mods & GLFW_MOD_SHIFT? -1: 1;
-		Application *app = reinterpret_cast<Application *> (
-				glfwGetWindowUserPointer(window));
-		if(action == GLFW_PRESS) {
-			switch(key) {
-			case GLFW_KEY_PAGE_DOWN:
-				start_scrolling(window, 1024);
-				break;
-			case GLFW_KEY_PAGE_UP:
-				start_scrolling(window, -1024);
-				break;
-			case GLFW_KEY_F3:
-				start_scrolling(window, neg * 8192);
-				break;
-			case GLFW_KEY_F4:
-				start_scrolling(window, neg * 0x10000);
-				break;
-			case GLFW_KEY_F5:
-				start_scrolling(window, neg * 0x100000);
-				break;
-			case GLFW_KEY_F6:
-				start_scrolling(window, neg * 0x1000000);
-				break;
-			case GLFW_KEY_F7:
-				start_scrolling(window, neg * 0x10000000);
-				break;
-			case GLFW_KEY_F8:
-				start_scrolling(window, neg * 0x100000000);
-				break;
-			case GLFW_KEY_F9:
-				start_scrolling(window, neg * 0x1000000000);
-				break;
-			case GLFW_KEY_HOME:
-				app->ifile_view_offset = 0;
-				app->dirty = true;
-				break;
-			case GLFW_KEY_END:
-				app->ifile_view_offset = app->ifile_size > 1184?
-						app->ifile_size - 1184: 0;
-				app->dirty = true;
-				break;
-			case GLFW_KEY_UP:
-				start_scrolling(window, -16);
-				break;
-			case GLFW_KEY_DOWN:
-				start_scrolling(window, 16);
-				break;
+	void on_mouse_motion(const SDL_Event *e) {
+		// update dragging of the scroll bar with left mouse button
+		if(scrollbar_dragged) {
+			int64_t prev_offset = ifile_view_offset;
+			double xpos = e->motion.x, ypos = e->motion.y;
+			double dy = ypos - scrollbar_initial_y;
+			// one pixel corresponds to ifile_size / 1048
+			ifile_view_offset =
+			double(scrollbar_initial_ifile_view_offset) +
+				dy * (double(ifile_size) / 1008);
+			ifile_view_offset = (ifile_view_offset / 16) * 16;
+			if(ifile_view_offset < 0) {
+				ifile_view_offset = 0;
 			}
-			if(app->ifile_view_offset < 0) {
-				app->ifile_view_offset = 0;
-				app->dirty = true;
-			}
-		} else if(action == GLFW_RELEASE) {
-			switch(key) {
-			case GLFW_KEY_PAGE_DOWN:
-			case GLFW_KEY_PAGE_UP:
-			case GLFW_KEY_F3:
-			case GLFW_KEY_F4:
-			case GLFW_KEY_F5:
-			case GLFW_KEY_F6:
-			case GLFW_KEY_F7:
-			case GLFW_KEY_F8:
-			case GLFW_KEY_F9:
-			case GLFW_KEY_UP:
-			case GLFW_KEY_DOWN:
-				stop_scrolling(window);
+			if(ifile_view_offset != prev_offset) {
+				dirty = true;
 			}
 		}
 	}
 
-	static void scroll_callback(GLFWwindow *window, double xoffset,
-			double yoffset) {
-		Application *app = reinterpret_cast<Application *>(
-				glfwGetWindowUserPointer(window));
-		app->ifile_view_offset += int(yoffset) * 16
-				* MOUSEWHEELYDIR;
-		if(app->ifile_view_offset < 0) {
-			app->ifile_view_offset = 0;
-		}
-		app->dirty = true;
-	}
-
-	static void btn_callback(GLFWwindow *window, int button, int action,
-			int mods) {
-		Application *app = reinterpret_cast<Application *>(
-				glfwGetWindowUserPointer(window));
-		if(button == GLFW_MOUSE_BUTTON_LEFT) {
-			if(action == GLFW_PRESS) {
-				// check if scrollbar is being pressed
-				double xpos, ypos;
-				glfwGetCursorPos(window, &xpos, &ypos);
-				// calculate scrollbar size:
-				// window contains 1200 bytes
-				// and scrollbar available height is 1048 pixels
-				double scrollbar_size = (1200.0 /
-					double(app->ifile_size)) * 1048.0;
-				// minimum scrollbar size is 40 pixels
-				if(scrollbar_size < 40) {
-					scrollbar_size = 40;
+	void mainLoop() {
+		while(1) {
+			SDL_Event e;
+			bool quitting = false;
+			while(SDL_PollEvent(&e)) {
+				int s = SDL_GetModState() & KMOD_SHIFT? -1: 1;
+				switch(e.type) {
+				case SDL_QUIT:
+					quitting = true;
+					break;
+				case SDL_WINDOWEVENT:
+					switch(e.window.event) {
+					case SDL_WINDOWEVENT_RESIZED:
+						if(window_w != e.window.data1 &&
+						window_h != e.window.data2) {
+							window_w = e.window.data1;
+							window_h = e.window.data2;
+							framebufferResized = true;
+							dirty = true;
+						}
+						break;
+					}
+					break;
+				case SDL_MOUSEBUTTONDOWN:
+					if(e.button.button == SDL_BUTTON_LEFT) {
+						SDL_CaptureMouse(SDL_TRUE);
+						on_left_btn_pressed(&e);
+					}
+					break;
+				case SDL_MOUSEBUTTONUP:
+					if(e.button.button == SDL_BUTTON_LEFT) {
+						SDL_CaptureMouse(SDL_FALSE);
+						scrollbar_dragged = false;
+					}
+					break;
+				case SDL_MOUSEWHEEL:
+					if(e.wheel.y > 0) { // scroll up
+						scroll_one_step(-16);
+					} else if(e.wheel.y < 0) { // down
+						scroll_one_step(16);
+					}
+					break;
+				case SDL_MOUSEMOTION:
+					on_mouse_motion(&e);
+					break;
+				case SDL_KEYDOWN:
+					switch(e.key.keysym.sym) {
+					case SDLK_HOME:
+						if(ifile_view_offset) {
+							ifile_view_offset = 0;
+							dirty = true;
+						}
+						break;
+					case SDLK_END:
+						if(ifile_size <= 1184) {
+							if(ifile_view_offset) {
+							ifile_view_offset = 0;
+							dirty = true;
+							}
+						} else {
+							int64_t end = (ifile_size
+								-1184) / 16 * 16;
+							if(ifile_view_offset !=
+								end) {
+							ifile_view_offset = end;
+								dirty = true;
+							}
+						}
+						break;
+					case SDLK_PAGEUP:
+						scroll_one_step(-0x100);
+						break;
+					case SDLK_PAGEDOWN:
+						scroll_one_step(0x100);
+						break;
+					case SDLK_F3:
+						scroll_one_step(s * 0x1000);
+						break;
+					case SDLK_F4:
+						scroll_one_step(s * 0x10000);
+						break;
+					case SDLK_F5:
+						scroll_one_step(s * 0x100000);
+						break;
+					case SDLK_F6:
+						scroll_one_step(s * 0x1000000);
+						break;
+					case SDLK_F7:
+						scroll_one_step(s * 0x10000000);
+						break;
+					case SDLK_F8:
+						scroll_one_step(s * 0x100000000);
+						break;
+					case SDLK_F9:
+						scroll_one_step(s * 0x1000000000);
+						break;
+					case SDLK_UP:
+						scroll_one_step(-16);
+						break;
+					case SDLK_DOWN:
+						scroll_one_step(16);
+						break;
+					case SDLK_LEFT:
+						scroll_one_step(-1184);
+						break;
+					case SDLK_RIGHT:
+						scroll_one_step(1184);
+						break;
+					}
+					break;
+				case SDL_KEYUP:
+					break;
 				}
-				// calculate current scrollbar vert. position:
-				double scrollbar_pos = ((double(
-					app->ifile_view_offset) /
-					double(app->ifile_size)) *
-					(1048.0 - scrollbar_size)) + 15.0;
-				// std::cout << scrollbar_pos << "\n";
-				if(xpos > 2 && xpos < 11 &&
-						ypos > scrollbar_pos
-						&& ypos < (scrollbar_pos +
-						scrollbar_size)) {
-					app->scrollbar_dragged = true;
-					app->scrollbar_initial_y = ypos;
-					app->
-					scrollbar_initial_ifile_view_offset =
-					app->ifile_view_offset;
-				}
-			} else if(action == GLFW_RELEASE) {
-				app->scrollbar_dragged = false;
 			}
+<<<<<<< HEAD
+			if(quitting) break;
+=======
 		}
 	}
 
@@ -511,12 +530,11 @@ private:
 				}
 			}
 
+>>>>>>> 295655384618a3b866ab2cff33eca5c29ffb06e5
 			if(dirty) {
 				drawFrame();
-				// std::cout << "drawing frame\n";
-			} else {
-				usleep(10000);
 			}
+			SDL_Delay(5);
 		}
 	}
 
@@ -587,17 +605,17 @@ private:
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
 
-		glfwDestroyWindow(window);
+		SDL_DestroyWindow(window);
 
-		glfwTerminate();
+		SDL_Quit();
 	}
 
 	void recreateSwapChain() {
 		int width = 0, height = 0;
-		glfwGetFramebufferSize(window, &width, &height);
+		SDL_Vulkan_GetDrawableSize(window, &width, &height);
 		while(width == 0 || height == 0) {
-			glfwGetFramebufferSize(window, &width, &height);
-			glfwWaitEvents();
+			SDL_Vulkan_GetDrawableSize(window, &width, &height);
+			SDL_WaitEvent(nullptr);
 		}
 
 		vkDeviceWaitIdle(device);
@@ -690,8 +708,7 @@ private:
 	}
 
 	void createSurface() {
-		if(glfwCreateWindowSurface(instance, window, nullptr, &surface)
-				!= VK_SUCCESS) {
+		if(!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
 			throw std::runtime_error(
 					"failed to create window surface!");
 		}
@@ -1750,12 +1767,25 @@ private:
 	}
 
 	void drawFrame() {
-		Application *app = static_cast<Application *> (
-				glfwGetWindowUserPointer(window));
-
+		static int64_t frame_counter = 0; // temp workaround a nasty bug
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame],
 				VK_TRUE, UINT64_MAX);
 
+<<<<<<< HEAD
+		// update the keyboard autorepeat scrolling
+		int64_t now_ms = std::chrono::duration_cast
+			<std::chrono::milliseconds>(
+			std::chrono::time_point_cast
+			<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now())
+			.time_since_epoch()).count();
+		if(next_scroll_ms && now_ms >= next_scroll_ms) {
+//			scroll_one_step(window);
+			next_scroll_ms = now_ms + autorepeat_rate;
+		}
+
+=======
+>>>>>>> 295655384618a3b866ab2cff33eca5c29ffb06e5
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(device, swapChain,
 				UINT64_MAX, imageAvailableSemaphores[
@@ -1818,17 +1848,21 @@ private:
 
 		result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
+		dirty = true;
+
 		if(result == VK_ERROR_OUT_OF_DATE_KHR ||
 			result == VK_SUBOPTIMAL_KHR || framebufferResized) {
 			framebufferResized = false;
 			recreateSwapChain();
-		} else if (result != VK_SUCCESS) {
+		} else if(result != VK_SUCCESS) {
 			throw std::runtime_error(
 					"failed to present swap chain image!");
+		} else {
+			currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+			if(frame_counter++) {
+				dirty = false;
+			}
 		}
-
-		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-		dirty = false;
 	}
 
 	VkShaderModule createShaderModule(const std::vector<uint8_t>& code) {
@@ -1878,7 +1912,7 @@ private:
 			return capabilities.currentExtent;
 		} else {
 			int width, height;
-			glfwGetFramebufferSize(window, &width, &height);
+			SDL_Vulkan_GetDrawableSize(window, &width, &height);
 
 			VkExtent2D actualExtent = {
 				static_cast<uint32_t>(width),
@@ -2004,16 +2038,22 @@ private:
 	}
 
 	std::vector<const char*> getRequiredExtensions() {
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(
-				&glfwExtensionCount);
-
-		std::vector<const char*> extensions(glfwExtensions,
-				glfwExtensions + glfwExtensionCount);
+		unsigned int count;
+		if(!SDL_Vulkan_GetInstanceExtensions(window, &count, nullptr)) {
+			throw std::runtime_error(
+				"Can't get Vulkan Instance Extensions");
+		}
+		std::vector<const char *> extensions;
 
 		if(enableValidationLayers) {
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		}
+		size_t additionalcount = extensions.size();
+		extensions.resize(count + additionalcount);
+		if(!SDL_Vulkan_GetInstanceExtensions(window, &count,
+				extensions.data() + additionalcount)) {
+			throw std::runtime_error(
+				"Can't get my Vulkan Instance Extensions");
 		}
 
 		return extensions;
