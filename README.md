@@ -4,6 +4,8 @@ Hex viewer for Linux using Vulkan via SDL2
 This GUI program is written in C++ and requires hardware that supports Vulkan.
 It depends on Vulkan and SDL2
 
+A windows binary package is now available at https://wizstaff.com/winshex.zip
+
 To build: type inside the shex/ directory:
 
 ./mk
@@ -25,12 +27,11 @@ After switch to SDL2, you can now also run it as a Wayland app:
 SDL_VIDEODRIVER=wayland ./shex shaders/frag.spv
 
 There is a windows build command 'mkwin', which allows to cross-compile a
-windows binary on linux. I'm not sure it's working, but if you want to test
-it, type this in the shex/ directory:
+windows binary on linux. I tested the binary on my Windows 10 system.
 
 ./mkwin
 
-You might need to put these files in the same directory as shex.exe:
+You need to put these files in the same directory as shex.exe:
 SDL2.dll
 libwinpthread-1.dll
 vulkan-1.dll
