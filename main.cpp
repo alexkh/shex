@@ -269,7 +269,8 @@ private:
 
 		std::string window_title = std::string(input_fname) + " - shex";
 
-		window = SDL_CreateWindow(window_title.c_str(), 0, 0,
+		window = SDL_CreateWindow(window_title.c_str(),
+				SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 				WIDTH, HEIGHT,
 				SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
@@ -1997,6 +1998,7 @@ private:
 			throw std::runtime_error(
 				"Can't get Vulkan Instance Extensions");
 		}
+		std::cout << "Number of extensions: " << count << "\n";
 		std::vector<const char *> extensions;
 
 		if(enableValidationLayers) {

@@ -1,4 +1,4 @@
 x86_64-w64-mingw32-g++ -DNDEBUG -D_WIN64 -D_WIN32 -std=c++17 -o shex.exe \
-	main.cpp -I. -DMOUSEWHEELYDIR=-1 \
+	main.cpp -I. \
 	-static-libgcc -static-libstdc++ -mwindows -lvulkan \
-	-lglfw3 -lgdi32 -fstack-protector-all
+	-lmingw32 -lSDL2main -lSDL2 -lgdi32 -fstack-protector-all
