@@ -234,12 +234,6 @@ private:
 	size_t chunk_file_offset = 0; // file offset of chunk sent to shader
 	int64_t ifile_view_offset = 0; // file offset of first line displayed
 	size_t ifile_size = 0;
-	int64_t current_scroll_step = 0; // scrolling step when a key is pressed
-	int64_t next_scroll_ms = 0; // if a key is pressed, when to scroll again
-
-	int64_t autorepeat_delay = 180;
-	int64_t autorepeat_rate = 60;
-
 
 	// loads a chunk of input file: returns size actually loaded
 	size_t load_chunk(const char *fname, size_t offset,
@@ -717,7 +711,7 @@ private:
 		}
 
 		VkPhysicalDeviceFeatures deviceFeatures = {};
-		deviceFeatures.samplerAnisotropy = VK_TRUE;
+//		deviceFeatures.samplerAnisotropy = VK_TRUE;
 
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1729,18 +1723,6 @@ private:
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame],
 				VK_TRUE, UINT64_MAX);
 
-		// update the keyboard autorepeat scrolling
-		int64_t now_ms = std::chrono::duration_cast
-			<std::chrono::milliseconds>(
-			std::chrono::time_point_cast
-			<std::chrono::milliseconds>(
-			std::chrono::steady_clock::now())
-			.time_since_epoch()).count();
-		if(next_scroll_ms && now_ms >= next_scroll_ms) {
-//			scroll_one_step(window);
-			next_scroll_ms = now_ms + autorepeat_rate;
-		}
-
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(device, swapChain,
 				UINT64_MAX, imageAvailableSemaphores[
@@ -1933,7 +1915,7 @@ private:
 		vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
 
 		return indices.isComplete() && extensionsSupported &&
-		swapChainAdequate && supportedFeatures.samplerAnisotropy;
+		swapChainAdequate; // && supportedFeatures.samplerAnisotropy;
 	}
 
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
